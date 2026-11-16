@@ -1,0 +1,69 @@
+# Build products and dependency caches
+build/
+.deps/
+dist/
+node_modules/
+*.o
+*.a
+*.so
+*.so.*
+*.d
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Dart and Flutter package artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+coverage/
+
+# Local configuration and credentials
+.secrets/
+.env
+.env.*
+!.env.example
+*.env
+*.cnf
+*.key
+*.pem
+*.p12
+*.pfx
+initial-admin.txt
+*.local
+
+# Runtime and test artifacts
+artifacts/
+logs/
+tmp/
+.cache/
+*.log
+*.pid
+*.sock
+core
+core.*
+
+# Editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+*~

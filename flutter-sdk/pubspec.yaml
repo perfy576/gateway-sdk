@@ -1,0 +1,13 @@
+name: gateway_sdk
+description: Gateway login client for Flutter and protocol-compatible Dart backend authentication.
+version: 1.2.0
+publish_to: none
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+dependencies:
+  crypto: ^3.0.8
+  dart_jsonwebtoken: ^3.4.1
+  http: ^1.6.0
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.15

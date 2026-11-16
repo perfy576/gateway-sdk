@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Gateway SDK
+Description: Versioned Gateway authentication SDK for C++17
+Version: 1.2.0
+Requires: nlohmann_json openssl libcurl
+Libs: -L${libdir} -lgateway_sdk -pthread
+Cflags: -I${includedir} -std=c++17
