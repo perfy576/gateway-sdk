@@ -58,7 +58,12 @@ Future<void> main() async {
   final env = Platform.environment;
   final transport = LocalGatewayTransport(Uri.parse(origin));
   final app = GatewayClient(
-      gatewayHost: origin, serviceHost: host, appid: appid, client: transport);
+      gatewayHost: origin,
+      serviceHost: host,
+      appid: appid,
+      appPackage: 'com.example.gateway.integration',
+      userAgent: 'GatewayFlutterIntegration/$sdkVersion',
+      client: transport);
   final sdk =
       GatewaySDK(gatewayHost: origin, serviceHost: host, client: transport);
   final secret = env['GATEWAY_TOKEN_SECRET']!;

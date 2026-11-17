@@ -8,6 +8,7 @@ Future<void> main() async {
     gatewayHost: env['GATEWAY_HOST']!,
     serviceHost: env['GATEWAY_SERVICE_HOST']!,
     appid: env['GATEWAY_APPID']!,
+    appPackage: env['GATEWAY_APP_PACKAGE'] ?? '',
   );
   try {
     final path = env['GATEWAY_REQUEST_PATH'] ?? '/private';

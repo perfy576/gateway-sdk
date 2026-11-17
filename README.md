@@ -6,7 +6,7 @@
 - C++：[`cpp-sdk`](cpp-sdk/README.md)，C++17，使用 jwt-cpp / OpenSSL / libcurl。
 - Flutter / Dart：[`flutter-sdk`](flutter-sdk/README.md)，Dart >= 3.4，支持 Flutter 本地 path、Git 子目录和 Git submodule 引用；原生 App 使用不含 Secret 的 `GatewayClient`，可信 Dart 后端使用 `GatewaySDK`。
 
-当前 SDK 发布版本是 `1.2.0`，支持 Token 协议 v1 和 Cookie 协议 v1。SDK 发布版本与协议版本独立。
+C++ / Python SDK 当前发布版本是 `1.2.0`，Flutter / Dart SDK 是 `1.3.0`（支持原生客户端包名和 User-Agent 上报），均支持 Token 协议 v1 和 Cookie 协议 v1。SDK 发布版本与协议版本独立。
 
 ## checkCookie
 

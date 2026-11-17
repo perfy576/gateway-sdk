@@ -331,32 +331,40 @@ void main() {
     test('secret-free challenge, JSON login and scoped business requests',
         () async {
       var step = 0;
-      final client = native(client: MockClient((r) async {
-        expect(r.followRedirects, false);
-        switch (step++) {
-          case 0:
-            expect(r.url.toString(), 'https://$service$target');
-            expect(r.headers['Cookie'], isNull);
-            return http.Response('', 302, headers: {
-              'location': '$origin/login?appid=$appid&token=challenge'
-            });
-          case 1:
-            expect(r.url.toString(), '$origin/login');
-            expect(r.method, 'POST');
-            expect(jsonDecode(r.body), {
-              'appid': appid,
-              'username': 'alice',
-              'passwd': 'password',
-              'token': 'challenge'
-            });
-            expect(r.headers['Cookie'], isNull);
-            return success();
-          default:
-            expect(r.headers['Cookie'], session);
-            expect(r.url.host, service);
-            return http.Response('business', 200);
-        }
-      }));
+      final client = GatewayClient(
+          gatewayHost: origin,
+          serviceHost: service,
+          appid: appid,
+          appPackage: 'com.example.reader',
+          userAgent: 'Reader/2.0 (Flutter; android)',
+          client: MockClient((r) async {
+            expect(r.followRedirects, false);
+            expect(r.headers['X-Gateway-App-Package'], 'com.example.reader');
+            expect(r.headers['User-Agent'], 'Reader/2.0 (Flutter; android)');
+            switch (step++) {
+              case 0:
+                expect(r.url.toString(), 'https://$service$target');
+                expect(r.headers['Cookie'], isNull);
+                return http.Response('', 302, headers: {
+                  'location': '$origin/login?appid=$appid&token=challenge'
+                });
+              case 1:
+                expect(r.url.toString(), '$origin/login');
+                expect(r.method, 'POST');
+                expect(jsonDecode(r.body), {
+                  'appid': appid,
+                  'username': 'alice',
+                  'passwd': 'password',
+                  'token': 'challenge'
+                });
+                expect(r.headers['Cookie'], isNull);
+                return success();
+              default:
+                expect(r.headers['Cookie'], session);
+                expect(r.url.host, service);
+                return http.Response('business', 200);
+            }
+          }));
       addTearDown(client.close);
       final challenge = await client.beginLogin(target);
       expect(challenge.appid, appid);
@@ -370,6 +378,51 @@ void main() {
       expect(client.hasSession, true);
       expect((await client.request('GET', target)).body, 'business');
       expect(step, 3);
+    });
+    test(
+        'legacy construction reports SDK agent without requiring an app package',
+        () async {
+      final client = native(client: MockClient((request) async {
+        expect(request.headers['User-Agent'], 'GatewayFlutterSDK/$sdkVersion');
+        expect(request.headers['X-Gateway-App-Package'], isNull);
+        return http.Response('', 302, headers: {
+          'location': '$origin/login?appid=$appid&token=challenge'
+        });
+      }));
+      addTearDown(client.close);
+      await client.beginLogin(target);
+    });
+    test('client metadata rejects header injection and oversized fields', () {
+      for (final package in [
+        'bad\r\nX-Evil: yes',
+        'has space',
+        'com.example\n',
+        '.invalid',
+        'a' * 256,
+        '\u5305\u540d'
+      ]) {
+        expect(
+            () => GatewayClient(
+                gatewayHost: origin,
+                serviceHost: service,
+                appid: appid,
+                appPackage: package),
+            throwsArgumentError);
+      }
+      for (final agent in [
+        '',
+        'bad\r\nX-Evil: yes',
+        'a' * 1025,
+        '\u5ba2\u6237\u7aef'
+      ]) {
+        expect(
+            () => GatewayClient(
+                gatewayHost: origin,
+                serviceHost: service,
+                appid: appid,
+                userAgent: agent),
+            throwsArgumentError);
+      }
     });
     test('invalid, foreign and ambiguous login URLs reject', () {
       final client = native();

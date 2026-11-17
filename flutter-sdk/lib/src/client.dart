@@ -8,6 +8,8 @@ class GatewayClient {
   final Uri gateway;
   final String serviceHost;
   final String appid;
+  final String appPackage;
+  final String userAgent;
   final Duration timeout;
   final http.Client _client;
   final bool _ownsClient;
@@ -20,6 +22,8 @@ class GatewayClient {
       {required String gatewayHost,
       required String serviceHost,
       required this.appid,
+      this.appPackage = '',
+      this.userAgent = 'GatewayFlutterSDK/$sdkVersion',
       this.timeout = const Duration(seconds: 10),
       http.Client? client})
       : gateway = httpsOrigin(gatewayHost),
@@ -27,6 +31,17 @@ class GatewayClient {
         _client = client ?? http.Client(),
         _ownsClient = client == null {
     validateAppid(appid);
+    if (appPackage.isNotEmpty &&
+        RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$').stringMatch(appPackage) !=
+            appPackage) {
+      throw ArgumentError('Invalid application package name');
+    }
+    if (userAgent.isEmpty ||
+        userAgent.length > 1024 ||
+        userAgent.codeUnits.any((c) => c < 32 || c > 126)) {
+      throw ArgumentError(
+          'User-Agent must contain 1..1024 printable ASCII characters');
+    }
     if (timeout <= Duration.zero || timeout > const Duration(seconds: 30)) {
       throw ArgumentError('Timeout must be within 0..30 seconds');
     }
@@ -42,10 +57,16 @@ class GatewayClient {
   /// A stored cookie is not proof of a currently valid server-side session.
   bool get hasSession => _cookie.isNotEmpty;
 
+  Map<String, String> get _clientHeaders => {
+        'User-Agent': userAgent,
+        if (appPackage.isNotEmpty) 'X-Gateway-App-Package': appPackage,
+      };
+
   /// Obtain the existing gateway-issued challenge without shipping an app secret.
   Future<LoginRequest> beginLogin(String uri) async {
     _native();
-    final request = http.Request('GET', serviceUri(serviceHost, 'GET', uri));
+    final request = http.Request('GET', serviceUri(serviceHost, 'GET', uri))
+      ..headers.addAll(_clientHeaders);
     final response = await limitedResponse(_client, request, timeout);
     if (response.statusCode != 302 && response.statusCode != 303) {
       throw GatewayClientException(
@@ -96,6 +117,7 @@ class GatewayClient {
     }
     final generation = ++_loginGeneration;
     final request = http.Request('POST', gateway.resolve('/login'))
+      ..headers.addAll(_clientHeaders)
       ..headers['Content-Type'] = 'application/json'
       ..body = jsonEncode({
         'appid': appid,
@@ -146,6 +168,7 @@ class GatewayClient {
     }
     final request = http.Request(method, serviceUri(serviceHost, method, uri))
       ..followRedirects = false
+      ..headers.addAll(_clientHeaders)
       ..headers.addAll(headers);
     final cookie = _cookie;
     if (cookie.isNotEmpty) request.headers['Cookie'] = cookie;

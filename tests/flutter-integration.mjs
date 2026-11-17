@@ -78,15 +78,22 @@ try {
     body: {username: adminUsername, password, mode: 'admin'}});
   assert.equal(auth.status, 200);
   adminCookie = auth.headers['set-cookie'].map(c => c.split(';')[0]).join('; ');
-  csrf = (await api('/api/me')).csrf;
+  const me = await api('/api/me');csrf = me.csrf;
   id = (await api('/api/admin/services', 'POST', {appid, host, name: 'Flutter SDK integration',
     upstream: 'http://127.0.0.1:' + backend.address().port,
-    enabled: true, allow_all: false, users: [], excluded_paths: []})).id;
+    enabled: true, allow_all: false, users: [me.user.id], excluded_paths: []})).id;
   secret = (await api(`/api/admin/services/${id}/secret`, 'POST', {})).secret;
   const input = {gateway_host: origin, audience: host, appid, uri: target, method: 'GET'};
   const result = await run('dart', ['run', 'tool/live_probe.dart'], input,
     {GATEWAY_USERNAME: adminUsername, GATEWAY_PASSWORD: password}, path.join(sdk, 'flutter-sdk'));
   assert.equal(result.result, 'Ok'); assert.equal(result.username, adminUsername);
+  const sessions=(await api('/api/admin/state')).sessions.filter(session=>session.service_id===id);
+  assert(sessions.length>0);
+  assert(sessions.every(session=>session.app_package==='com.example.gateway.integration'&&session.user_agent==='GatewayFlutterIntegration/1.3.0'));
+  const audits=(await api('/api/admin/audit')).entries.filter(entry=>entry.action==='login.success'&&entry.detail==='appid='+appid);
+  assert(audits.length>0);
+  assert(audits.every(entry=>entry.app_package==='com.example.gateway.integration'&&entry.user_agent==='GatewayFlutterIntegration/1.3.0'));
+  console.log('PASS real Flutter SDK package and User-Agent reach Gateway sessions and audit');
   console.log('PASS Dart/Flutter: ' + result.checks.join(', '));
   for (const language of ['python', 'cpp']) {
     const command = language === 'python' ? path.join(sdk, '.venv/bin/python') : path.join(sdk, 'build/gateway-sdk-verify');
