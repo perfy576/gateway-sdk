@@ -9,6 +9,7 @@ import path from 'node:path';
 
 const sdk = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const gateway = process.env.GATEWAY_SOURCE_DIR || '/data/code/gateway';
+const {protectPasswordBody}=await import(path.join(gateway,'tools/password-envelope.mjs'));
 const origin = process.env.GATEWAY_HOST || 'https://gateway.perfy576.com';
 const host = 'gateway-flutter-' + randomBytes(4).toString('hex') + '.invalid';
 const appid = 'Flutter_' + randomBytes(4).toString('hex');
@@ -28,8 +29,9 @@ backend.on('connection', socket => {
 });
 await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
 
-function request(route, {method = 'GET', body, admin = false} = {}) {
+async function request(route, {method = 'GET', body, admin = false} = {}) {
   const url = new URL(route, origin);
+  body=await protectPasswordBody(url.pathname,method,body,async target=>(await request(target,{admin})).json);
   const headers = {Host: url.hostname};
   let data;
   if (admin) headers.Cookie = adminCookie;
@@ -89,10 +91,10 @@ try {
   assert.equal(result.result, 'Ok'); assert.equal(result.username, adminUsername);
   const sessions=(await api('/api/admin/state')).sessions.filter(session=>session.service_id===id);
   assert(sessions.length>0);
-  assert(sessions.every(session=>session.app_package==='com.example.gateway.integration'&&session.user_agent==='GatewayFlutterIntegration/1.3.0'));
+  assert(sessions.every(session=>session.app_package==='com.example.gateway.integration'&&session.user_agent==='GatewayFlutterIntegration/2.0.0'));
   const audits=(await api('/api/admin/audit')).entries.filter(entry=>entry.action==='login.success'&&entry.detail==='appid='+appid);
   assert(audits.length>0);
-  assert(audits.every(entry=>entry.app_package==='com.example.gateway.integration'&&entry.user_agent==='GatewayFlutterIntegration/1.3.0'));
+  assert(audits.every(entry=>entry.app_package==='com.example.gateway.integration'&&entry.user_agent==='GatewayFlutterIntegration/2.0.0'));
   console.log('PASS real Flutter SDK package and User-Agent reach Gateway sessions and audit');
   console.log('PASS Dart/Flutter: ' + result.checks.join(', '));
   for (const language of ['python', 'cpp']) {

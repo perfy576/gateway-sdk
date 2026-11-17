@@ -7,6 +7,7 @@ import 'package:gateway_sdk/gateway_sdk.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
+import 'password_fixture.dart';
 
 const origin = 'https://gateway.example.com';
 const service = 'app.example.com';
@@ -61,7 +62,10 @@ GatewayRequest input(
 GatewaySDK backend({http.Client? client}) =>
     GatewaySDK(gatewayHost: origin, serviceHost: service, client: client);
 GatewayClient native({http.Client? client}) => GatewayClient(
-    gatewayHost: origin, serviceHost: service, appid: appid, client: client);
+    gatewayHost: origin,
+    serviceHost: service,
+    appid: appid,
+    client: client == null ? null : PasswordTestClient(client));
 
 Map<String, dynamic> onlineResponse(GatewayRequest request,
         {Map<String, dynamic>? identity}) =>
@@ -337,7 +341,7 @@ void main() {
           appid: appid,
           appPackage: 'com.example.reader',
           userAgent: 'Reader/2.0 (Flutter; android)',
-          client: MockClient((r) async {
+          client: PasswordTestClient(MockClient((r) async {
             expect(r.followRedirects, false);
             expect(r.headers['X-Gateway-App-Package'], 'com.example.reader');
             expect(r.headers['User-Agent'], 'Reader/2.0 (Flutter; android)');
@@ -364,7 +368,7 @@ void main() {
                 expect(r.url.host, service);
                 return http.Response('business', 200);
             }
-          }));
+          })));
       addTearDown(client.close);
       final challenge = await client.beginLogin(target);
       expect(challenge.appid, appid);

@@ -6,7 +6,7 @@
 - C++：[`cpp-sdk`](cpp-sdk/README.md)，C++17，使用 jwt-cpp / OpenSSL / libcurl。
 - Flutter / Dart：[`flutter-sdk`](flutter-sdk/README.md)，Dart >= 3.4，支持 Flutter 本地 path、Git 子目录和 Git submodule 引用；原生 App 使用不含 Secret 的 `GatewayClient`，可信 Dart 后端使用 `GatewaySDK`。
 
-C++ / Python SDK 当前发布版本是 `1.2.0`，Flutter / Dart SDK 是 `1.3.0`（支持原生客户端包名和 User-Agent 上报），均支持 Token 协议 v1 和 Cookie 协议 v1。SDK 发布版本与协议版本独立。
+C++ / Python SDK 当前发布版本是 `1.2.0`，Flutter / Dart SDK 是 `2.0.0`（公钥加密密码传输，以及客户端包名和 User-Agent 上报），均支持 Token 协议 v1 和 Cookie 协议 v1。SDK 发布版本与协议版本独立。
 
 ## checkCookie
 
@@ -32,10 +32,10 @@ Secret 由网关生成，只保存当前一个；控制台可更换。在线校�
 
 ## App 接口登录
 
-三套后端 SDK 均提供 `createLoginToken`（参数命名见各 SDK 文档）。将返回的 Token 与同一 AppID、用户名和密码以 JSON 提交到 `POST /login`，无需浏览器 Cookie、CSRF 头或跳转：
+三套后端 SDK 均提供 `createLoginToken`（参数命名见各 SDK 文档）。先通过 HTTPS GET `/api/public/password-key` 获取公钥及服务端毫秒时间戳，把密码加密为 JWE 后与同一 AppID、用户名和 Token 提交到 `POST /login`，无需浏览器 Cookie、CSRF 头或跳转。Flutter 2.0.0 的 `login` 自动完成这些步骤：
 
 ```json
-{"appid":"my-app","username":"alice","passwd":"<password>","token":"<signed-login-token>"}
+{"appid":"my-app","username":"alice","password_envelope":"<compact-JWE>","token":"<signed-login-token>"}
 ```
 
 成功为 HTTP 200：
@@ -44,11 +44,13 @@ Secret 由网关生成，只保存当前一个；控制台可更换。在线校�
 {"result":"Ok","retmsg":"登录成功","cookie":"__Host-gateway_session=v1.<session>; __Host-gateway_binding=v1.<binding>"}
 ```
 
-失败为 HTTP 400/401/403/410/415/426/429/503 等，对象始终包含 `result:"Failed"`、原因 `retmsg`、空字符串 `cookie`。`POST /login` 的结果与 `checkCookie` 的两个枚举是不同接口，不要混用。
+失败为 HTTP 400/401/403/409/410/415/426/429/503 等，对象始终包含 `result:"Failed"`、原因 `retmsg`、空字符串 `cookie`。明文 `passwd`/`password` 返回 426，过期或无效密文返回 400，已验证或更小时间戳返回 409。`POST /login` 的结果与 `checkCookie` 的两个枚举是不同接口，不要混用。
+
+公钥接口返回 `{jwk, timestamp_ms, audience}`；JWE 头固定 `{alg:"RSA-OAEP-256", enc:"A256GCM", kid:<公钥kid>, typ:"gateway-password+jwe"}`。明文内容为 `{audience:<Gateway origin>,username,timestamp_ms,context:["POST","/login",appid,token],passwords:{password:<密码>}}`，不压缩。时间戳每次提交重新从公钥接口获取；同账号所有登录入口共享数据库递增屏障，错误密码不推进，重启后继续有效。HTTPS 用于认证公钥来源，不能省略。C++/Python 后端 SDK 只签发登录 Token；自行调用登录接口的代码也必须生成上述标准 JWE。
 
 成功后把完整 `cookie` 值作为访问对应业务域名的 `Cookie` 请求头。它不能登录网关后台或其他服务。接口不会向网关域名设置浏览器 Cookie，也不会覆盖已有中央登录；有绑定 Cookie 摘要的后端 Token 仍由网关在实际转发时签发。若由业务后端代浏览器登录，应在业务域名分别设置两个 Cookie，使用 `Path=/; Secure; HttpOnly; SameSite=Lax`，不要通过前端脚本写入。
 
-也可以直接向生成的 `/login?appid=...&token=...` URL 发 POST，JSON 正文只传 `username`、`passwd`。URL 与正文同时提供 AppID/Token 时必须完全一致。
+也可以直接向生成的 `/login?appid=...&token=...` URL 发 POST，JSON 正文传 `username`、`password_envelope`，加密上下文仍包含 URL 中的 AppID/Token。URL 与正文同时提供 AppID/Token 时必须完全一致。
 
 SDK Token 和正常浏览器登录 URL 中的 Token 都可以调用该接口；当前进程内每个 Token 只能成功登录一次，并发提交只会有一次成功。失败可在有效期内重试，受登录限流约束。会话与已用 Token 标记只在内存，重启后会话失效、重放标记清空；SDK 自签 Token 仍受 5 分钟有效期约束。返回地址只影响浏览器回跳，不扩大 Cookie 的服务范围。Secret 仅放在可信服务端，移动客户端通过业务后端获取签名 Token，不应把 Secret 打包进应用。
 

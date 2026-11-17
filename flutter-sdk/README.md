@@ -1,6 +1,6 @@
 # Gateway Flutter / Dart SDK
 
-可直接放在 `gateway-sdk/flutter-sdk` 子目录。它是纯 Dart package，Flutter Android、iOS、macOS、Windows、Linux 项目均可引用，无需单独仓库或平台插件。当前版本 `1.3.0`，要求 Dart >= 3.4。
+可直接放在 `gateway-sdk/flutter-sdk` 子目录。它是纯 Dart package，Flutter Android、iOS、macOS、Windows、Linux 项目均可引用，无需单独仓库或平台插件。当前版本 `2.0.0`，要求 Dart >= 3.4。
 
 ## 项目接入
 
@@ -65,9 +65,11 @@ Future<String> loadPrivateData() async {
 // 不再使用时调用 gateway.close()。
 ```
 
-`beginLogin` 访问固定业务域名，读取网关签发的 `/login?appid=...&token=...`。然后 `login` 调用 `POST /login`，仅在响应成功且 Cookie 格式有效时保存会话。也可直接传入可信业务后端提供的签名 Token，或使用 `parseLoginUrl` 解析已收到的登录 URL。登录 Token 有有效期且只能成功消费一次；重新登录应重新获取。
+`beginLogin` 访问固定业务域名，读取网关签发的 `/login?appid=...&token=...`。然后 `login` 获取 `/api/public/password-key`，用返回的 RSA 公钥、服务端毫秒时间戳和 Gateway origin，通过标准 JOSE 库生成 `RSA-OAEP-256` + `A256GCM` 的 JWE，再调用 `POST /login`；请求仅含 `password_envelope`，不会传原始 `passwd` 或降级为明文。`passwd` 参数名保留给调用方。仅在响应成功且 Cookie 格式有效时保存会话。也可直接传入可信业务后端提供的签名 Token，或使用 `parseLoginUrl` 解析已收到的登录 URL。登录 Token 有有效期且只能成功消费一次；重新登录应重新获取。
 
-`appPackage` 是可选的客户端包名，通过 `X-Gateway-App-Package` 随挑战、登录及业务请求上报。默认 `User-Agent` 为 `GatewayFlutterSDK/1.3.0`，可用 `userAgent` 参数补充应用版本和平台；Flutter 应用可通过 `package_info_plus` 获取实际包名与版本后传入。包名只能包含 ASCII 字母、数字、点、下划线和短横线，最长 255 字符，首字符为字母或数字；User-Agent 限 1..1024 个可打印 ASCII 字符。网关会在会话和审计中记录这些信息。它们是客户端自行声明的识别信息，不是身份认证或权限依据。未传包名的旧接入方式不受影响。
+2.0.0 需要支持加密密码的新 Gateway。密文绑定账号、Gateway origin、请求路径、AppID 和 Token。服务端持久记录每个账号上次验密时间戳，拒绝相同或更小值；错误密码不会更新，过旧或远期值也会拒绝。公钥和时间戳每次提交重新获取；公钥异常、重定向或不可用直接报错，不会发送明文密码。`GatewayPasswordEnvelope.encrypt` 也可供独立的 Gateway 控制台传输使用。详见[密码信封协议](../README.md#app-接口登录)。
+
+`appPackage` 是可选的客户端包名，通过 `X-Gateway-App-Package` 随挑战、获取公钥、登录及业务请求上报。默认 `User-Agent` 为 `GatewayFlutterSDK/2.0.0`，可用 `userAgent` 参数补充应用版本和平台；Flutter 应用可通过 `package_info_plus` 获取实际包名与版本后传入。包名只能包含 ASCII 字母、数字、点、下划线和短横线，最长 255 字符，首字符为字母或数字；User-Agent 限 1..1024 个可打印 ASCII 字符。网关会在会话和审计中记录这些信息。它们是客户端自行声明的识别信息，不是身份认证或权限依据。
 
 `request` 仅允许该服务上的相对绝对路径，如 `/api/items?a=1`；使用 HTTPS，不跟随重定向，不允许覆盖 Host/Cookie。支持字符串或字节正文、额外业务 headers。默认超时 10 秒，业务响应最多 16 MiB；登录和验证响应最多 64 KiB。网络异常会抛出异常，业务自行展示错误或重试，不会自动重复提交登录或修改请求。
 

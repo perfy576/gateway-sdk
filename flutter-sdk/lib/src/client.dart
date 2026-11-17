@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'common.dart';
 import 'models.dart';
+import 'password_envelope.dart';
 
 /// Native Flutter/Dart client. The application owns any persistent secure storage.
 class GatewayClient {
@@ -116,13 +117,40 @@ class GatewayClient {
       throw ArgumentError('Invalid login credentials or token');
     }
     final generation = ++_loginGeneration;
+    final keyRequest =
+        http.Request('GET', gateway.resolve('/api/public/password-key'))
+          ..headers.addAll(_clientHeaders);
+    final keyResponse = await limitedResponse(_client, keyRequest, timeout);
+    if (keyResponse.statusCode != 200) {
+      throw GatewayClientException(
+          'Gateway password encryption key unavailable',
+          status: keyResponse.statusCode);
+    }
+    Map<String, dynamic> key;
+    try {
+      key = jsonObject(keyResponse.body);
+    } catch (_) {
+      throw const GatewayClientException(
+          'Malformed gateway password encryption key response');
+    }
+    final envelope = GatewayPasswordEnvelope.encrypt(
+      keyResponse: key,
+      audience: gateway.origin,
+      username: username,
+      context: ['POST', '/login', appid, token],
+      passwords: {'password': passwd},
+    );
+    if (generation != _loginGeneration) {
+      throw const GatewayClientException(
+          'Login result was superseded or cancelled');
+    }
     final request = http.Request('POST', gateway.resolve('/login'))
       ..headers.addAll(_clientHeaders)
       ..headers['Content-Type'] = 'application/json'
       ..body = jsonEncode({
         'appid': appid,
         'username': username,
-        'passwd': passwd,
+        'password_envelope': envelope,
         'token': token
       });
     final response = await limitedResponse(_client, request, timeout);

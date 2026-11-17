@@ -1,4 +1,4 @@
-const sdkVersion = '1.3.0';
+const sdkVersion = '2.0.0';
 const bindingCookieName = '__Host-gateway_binding';
 const sessionCookieName = '__Host-gateway_session';
 
